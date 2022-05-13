@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Stations</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+		<link type="text/css" rel="stylesheet" href="crt.css">
+	</head>
+	<body>
+		<div  class="screen" style="height: 100vh; position: absolute; pointer-events: none;">
+		<script>
+			var source = "./sounds/puter.mp3"
+			var audio = document.createElement("audio");
+			//
+			audio.autoplay = false;
+			//
+			audio.load()
+			audio.addEventListener("load", function() { 
+				audio.play(); 
+			}, true);
+			audio.src = source;
+		</script>
+		
+		<!--Source code by Temdog007-->
+		<!-- <div id="info">
+			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> Click on a sphere to toggle bloom<br>By <a href="http://github.com/Temdog007" target="_blank" rel="noopener">Temdog007</a>
+		</div> -->
+		<script src="./jsm/perlin.js"></script>
+		<script src="./jsm/seedrandom.js">
+			Math.seedrandom('test');
+		</script>
+
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform sampler2D baseTexture;
+			uniform sampler2D bloomTexture;
+
+			varying vec2 vUv;
+
+			void main() {
+
+				gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+
+			}
+
+		</script>
+
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./node_modules/three/build/three.module.js"
+				}
+			}
+		</script>
+
+		<script type="module">
+
+			var pn = new Perlin(420);
+
+			import * as THREE from 'three';
+			import { Clock } from 'three';
+
+			import { GUI } from './jsm/libs/lil-gui.module.min.js';
+
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
+			import { RenderPass } from './jsm/postprocessing/RenderPass.js';
+			import { ShaderPass } from './jsm/postprocessing/ShaderPass.js';
+			import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
+			import { OBJLoader } from './jsm/loaders/OBJLoader.js';
+			import { MTLLoader } from './jsm/loaders/MTLLoader.js';
+			import { OutlineEffect } from './jsm/shaders/OutlineEffect.js';
+			//import * as SceneUtils from './jsm/utils/SceneUtils.js';
+
+			//import { ToonShader2 } from './jsm/shaders/ToonShader.js';
+			import { PixelShader } from './jsm/shaders/PixelShader.js';
+
+			let composer;
+			let outerShader, params, effect;
+
+			let brightness = 0
+
+			const ENTIRE_SCENE = 0, BLOOM_SCENE = 1;
+
+			//const bloomLayer = new THREE.Layers();
+			//bloomLayer.set( BLOOM_SCENE );
+
+			const darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
+			const materials = {};
+
+			const renderer = new THREE.WebGLRenderer( { antialias: true });
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			renderer.toneMapping = THREE.ReinhardToneMapping;
+			renderer.setClearAlpha(1.0);
+			renderer.setClearColor( 0xffffff, 0);
+			
+			document.body.appendChild( renderer.domElement );
+
+			const scene = new THREE.Scene();
+			const screenScene = new THREE.Scene();
+			//window.scene = scene;
+
+			const camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 1000 );
+			camera.position.set( 40, 0, 0 );
+			//camera.setFocalLength(30);
+			camera.lookAt( 0, 0, 0 );
+			var cameraTarget = new THREE.Vector3(20, 5, 0);
+			var lookTarget = new THREE.Vector3(0, 0, 0);
+			var lookToggle = true;
+			//var focalTarget = 30;
+
+			const controls = new OrbitControls( camera, renderer.domElement );
+			controls.maxPolarAngle = Math.PI * 0.5;
+			controls.minDistance = 1;
+			controls.maxDistance = 1000;
+			controls.addEventListener( 'change', render );
+
+			scene.add( new THREE.AmbientLight( 0x404040 ) );
+
+			const renderScene = new RenderPass( scene, camera );
+
+			/*-----------------------TURNING OFF BLOOM FOR PERFORMANCE-----------------------*/
+
+			/*OBJECT ARRAYS---------------------------------------------------------------*/
+			var eyes = [];
+			var snowGeo;
+			var snowAr = [];
+			/*---------------------------------------------------------------OBJECT ARRAYS*/
+
+			//GLTF LOADER---------------------------------------------------------------
+
+			var Puter;
+			var puterCollision;
+			var GYS_Clothes;
+
+			function loadPuter(){
+				const onProgress = function ( xhr ) {
+				if ( xhr.lengthComputable ) {
+					const percentComplete = xhr.loaded / xhr.total * 100;
+					console.log( Math.round( percentComplete, 2 ) + '% downloaded' );
+				}
+				};
+
+				new MTLLoader()
+					.setPath( 'models/gltf/' )
+					.load( 'puter.mtl', function ( materials ) {
+
+						materials.preload();
+
+						new OBJLoader()
+							.setMaterials( materials )
+							.setPath( 'models/gltf/' )
+							.load( 'puter.obj', function ( object ) {
+
+								Puter = object;
+								Puter.scale.set(2, 2, 2);
+								Puter.userData.name = "Puter";
+
+								scene.add( object );
+
+							}, onProgress );
+
+					} );
+			}
+
+			function loadStoreSkull(){
+				//GLTF LOADER---------------------------------------------------------------
+				loader.load(
+					// resource URL
+					'models/gltf/GYS_Clothes.obj',
+					// called when resource is loaded
+					function ( object ) {
+						object.userData.name = "GYS_Clothes";
+						
+						GYS_Clothes = object;
+						GYS_Clothes.rotation.order = 'ZYX';
+						GYS_Clothes.rotation.y = Math.PI/2;
+						GYS_Clothes.rotation.x = Math.PI/2;
+						GYS_Clothes.scale.set(0.8, 0.8, 0.8);
+						GYS_Clothes.position.y = -3.5;
+
+						const material = new THREE.MeshBasicMaterial( { color: 'black' } );
+						GYS_Clothes.material = material;
+
+						scene.add( object );
+
+					},
+					// called when loading is in progresses
+					function ( xhr ) {
+
+						console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+
+					},
+					// called when loading has errors
+					function ( error ) {
+
+						console.log( 'An error happened' );
+
+					}
+				);
+				//---------------------------------------------------------------GLTF LOADER
+			}
+
+
+			const finalPass = new ShaderPass(
+				new THREE.ShaderMaterial( {
+					uniforms: {
+						baseTexture: { value: null },
+						//bloomTexture: { value: bloomComposer.renderTarget2.texture }
+					},
+					vertexShader: document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+					defines: {}
+				} ), 'baseTexture'
+			);
+			finalPass.needsSwap = true;
+
+			const finalComposer = new EffectComposer( renderer );
+			//Pixel Shader-----------------------------------------------------------------------
+			// composer = new EffectComposer( renderer );
+			// composer.addPass( new RenderPass( scene, camera ) );
+
+			outerShader = new ShaderPass( PixelShader );
+			outerShader.uniforms[ 'resolution' ].value = new THREE.Vector3( 3, 3, 3 );
+			outerShader.uniforms[ 'resolution' ].value.multiplyScalar( window.devicePixelRatio );
+			finalComposer.addPass( outerShader );
+
+			params = {
+				pixelSize: 16,
+				postprocessing: true
+			};
+			//-----------------------------------------------------------------------Pixel Shader
+			finalComposer.addPass( renderScene );
+			finalComposer.addPass( finalPass );
+
+			const raycaster = new THREE.Raycaster();
+
+			//const mouse = new THREE.Vector2();
+			var projector, mouse = {
+				x: 0,
+				y: 0
+			},
+			INTERSECTED;
+
+			window.addEventListener( 'pointerdown', onPointerDown );
+
+			renderer.toneMappingExposure = Math.pow( 1.6, 4.0 );
+
+			animate();
+
+			setupScene();
+
+			//STAR CLICKED---------------------------------------------------------------------
+			function onPointerDown( event ) {
+
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+				raycaster.setFromCamera( mouse, camera );
+				const intersects = raycaster.intersectObjects( scene.children, false );
+
+
+				//WHEN STAR IS CLICKED
+				if ( intersects.length > 0 ) {
+
+					const object = intersects[ 0 ].object;
+
+					if(object.name === "puter"){
+						zoom();
+					}
+
+					finalComposer.render();
+				}
+			}
+			//---------------------------------------------------------------------STAR CLICKED
+
+			function zoom(){
+				if(lookToggle){
+					var lookTarget = new THREE.Vector3(0, 0, 0);
+					console.log("puter clicked");
+					lookToggle = false;
+					cameraTarget = new THREE.Vector3(4, 1.4, 0);
+
+					controls.enableRotate = false;
+				} else {
+					console.log("puter un-clicked");
+					lookToggle = true;
+					cameraTarget = new THREE.Vector3(20, 5, 0);
+
+					controls.enableRotate = true;
+				}
+
+			}
+
+			//hover event-------------------------------------------------------
+			document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+			function onDocumentMouseMove(event) {
+				// the following line would stop any other event handler from firing
+				// (such as the mouse's TrackballControls)
+				// event.preventDefault();
+
+				// update the mouse variable
+				mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+				mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+				
+				//camera.lookAt(mouse.x*3, 0, mouse.y*3);
+				//controls.rotation.order = 'ZYX';
+				if(lookToggle){
+					lookTarget = new THREE.Vector3(0, mouse.y, -mouse.x);
+				} 
+			}
+
+			//-------------------------------------------------------hover event
+
+			//GAME LOOP-----------------------------------------------------------------
+			function animate() {
+
+				if(eyes.length === 2){
+					var time = new Date().getTime();
+					for(let i = 0; i <= 1; i++){
+						eyes[i].intensity = Math.abs(0.05 + 0.02*Math.cos(time/2000));
+					}
+				}
+
+				//snowFall();
+				//camera.lookAt(50, 0, 0);
+				camera.position.lerp(cameraTarget, 0.05);
+				controls.target.lerp(lookTarget, 0.1);
+				requestAnimationFrame( animate );
+				controls.update();
+
+				params = {
+					pixelSize: 16,
+					postprocessing: true
+				};
+				
+				
+				render();
+				//stats.update();
+
+			}
+			//-----------------------------------------------------------------GAME LOOP
+
+			//ANIMATE SNOWFALL----------------------------------------------------------
+			function snowFall(){
+
+				for(let i = 0; i < snowAr.length; i++){
+					snowAr[i].position.y = snowAr[i].position.y - 0.01;
+
+					if (snowAr[i].position.y < -10) {
+						removeEntity(snowAr[i]);
+						snowAr[i] = genSnowParticle(snowGeo, 10);
+						scene.add(snowAr[i]);
+					}
+				}
+			}
+			//----------------------------------------------------------ANIMATE SNOWFALL
+
+			function removeEntity(object) {
+				scene.remove( object );
+			}
+			function removeEntities(object){
+				for (let i = 0; i < object.length; i++) {
+					removeEntity(object[i]);
+				}
+				object = [];
+			}
+
+			window.onresize = function () {
+
+				const width = window.innerWidth;
+				const height = window.innerHeight;
+
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( width, height );
+
+				//bloomComposer.setSize( width, height );
+				finalComposer.setSize( width, height );
+				outerShader.uniforms[ 'resolution' ].value.set( window.innerWidth, window.innerHeight ).multiplyScalar( window.devicePixelRatio );
+
+				finalComposer.render();
+
+			};
+
+			function hypot(a, b){
+				return Math.sqrt((Math.pow(a.position.x, 2) - Math.pow(a.position.z, 2)) + (Math.pow(a.position.x, 2) - Math.pow(a.position.z, 2)));
+			}
+
+			function compare( a, b ) {
+				if ( a.position.x < b.position.x){
+					return -1;
+				} else {
+					return 1;
+				}
+				return 0;
+			}
+
+			function genSnowParticle(geometry, yOff){
+				const color = new THREE.Color();
+				color.setHSL( Math.random()* (0.75-0.6) + 0.6, 0.71, Math.random() * 0.2 + 0.05 );
+
+				const material = new THREE.MeshBasicMaterial( { color: 'red' } );
+				const snow = new THREE.Mesh( geometry, material );
+
+				let x=1*Math.log((Math.random() * 25)+1);
+				let z=1*Math.log((Math.random() * 25)+1);
+				let y=50*Math.log((Math.random() * 1) + 1);
+
+				snow.position.x = 70*pn.noise(x, y, 0) - 40;
+				snow.position.y = y + yOff;
+				snow.position.z = 70*pn.noise(0, y, z) - 35;
+				
+				snow.scale.setScalar( 0.2 * (Math.random() * Math.random() + 0.1) );
+				snow.rotation.y = Math.PI/2;
+				return snow;
+
+			}
+
+			function genLight(){
+
+				let x, y, z;
+				x = 4;
+				y = 2;
+				z = 1;
+
+				const light = new THREE.PointLight( 0xffffff, 0.05 + 0.02*Math.cos(brightness), 100 );
+				light.position.set( x, y, z );
+				scene.add( light );
+				eyes.push(light);
+
+				const light1 = new THREE.PointLight( 0x00ff00, 0.5*Math.cos(brightness), 100 );
+				light1.position.set( 0, 2, 0 );
+				scene.add( light1 );
+				eyes.push(light1);
+
+				const light2 = new THREE.PointLight( 0x00ff00, 0.1*Math.cos(brightness), 10 );
+				light2.position.set( 0, 2, 0 );
+				scene.add( light2 );
+
+				const light3 = new THREE.PointLight( 0xffffff, 0.2, 100 );
+				light3.position.set(5, 5, 5 );
+				scene.add( light3 );
+
+				// const eyeGeo = new THREE.SphereGeometry(0.2, 4);
+				// const color = new THREE.Color();
+				// color.setHSL( Math.random()* (0.75-0.6) + 0.6, 0.71, Math.random() * 0.2 + 0.05 );
+
+				// const material = new THREE.MeshBasicMaterial( { color: 'red' } );
+				// const test = new THREE.Mesh( eyeGeo, material );
+				// test.position.x = x;
+				// test.position.y = y;
+				// test.position.z = z;
+				// test.scale.setScalar( 1 );
+				// scene.add(test);
+			}
+
+			//gen screen------------------------------------------------------------------------
+			function genScreen(){
+				const geometry = new THREE.PlaneGeometry( 1, 1 );
+
+				const color = new THREE.Color();
+				color.setHSL( Math.random()* (0.75-0.6) + 0.6, 0.71, Math.random() * 0.2 + 0.05 );
+
+				const material = new THREE.MeshBasicMaterial( { color: 'green' } );
+				const screen = new THREE.Mesh( geometry, material );
+
+				screen.rotation.order = 'ZYX';
+
+				screen.scale.set(2.4, 1.75, 1);
+				screen.rotation.y = Math.PI/2;
+				screen.rotation.z = 0.15;
+
+				screen.position.x = 2.8;
+				screen.position.y = 0.75;
+				
+				scene.add(screen);
+			}
+			//------------------------------------------------------------------------gen screen
+
+			function genCollisions(){
+				let x, y, z;
+				x = 0;
+				y = 0;
+				z = 0;
+
+				const eyeGeo = new THREE.BoxGeometry(5.87, 5.87, 5.87);
+				const color = new THREE.Color();
+				color.setHSL( Math.random()* (0.75-0.6) + 0.6, 0.71, Math.random() * 0.2 + 0.05 );
+
+				const material = new THREE.MeshBasicMaterial( { color: 'red' } );
+				material.transparent = true;
+				material.opacity = 0;
+				const test = new THREE.Mesh( eyeGeo, material );
+				test.position.x = x;
+				test.position.y = y;
+				test.position.z = z;
+				test.scale.setScalar( 1 );
+				puterCollision = test;
+				puterCollision.name = "puter";
+				scene.add(test);
+			}
+
+			function genGui(){
+				const effectController = { zoom: false,};
+
+				const gui = new GUI();
+
+				gui.add( effectController, 'zoom', true ).onChange( zoom );
+			}
+
+			function setupScene() {
+
+				scene.traverse( disposeMaterial );
+				scene.children.length = 0;
+
+				const geometry = new THREE.PlaneGeometry( 1, 1 );
+				snowGeo = geometry;
+
+				var size = 200;
+
+				var yOff = 0;
+				//----------------------------------------------------------------------------------
+				loadPuter()
+				genLight();
+				//genScreen();
+				genCollisions();
+				genGui();
+				//----------------------------------------------------------------------------------
+
+				// for ( let i = 0; i < size; i ++ ) {
+
+				// 	var snow = genSnowParticle(snowGeo, yOff);
+
+				// 	snowAr.push(snow);
+
+				// 	//add star to scene
+				// 	scene.add( snow );
+
+				// }
+
+				//genScreen();
+
+				//Pixel Shader-----------------------------------------------------------------------
+				// composer = new EffectComposer( renderer );
+				// composer.addPass( new RenderPass( scene, camera ) );
+
+				outerShader = new ShaderPass( PixelShader );
+				outerShader.uniforms[ 'resolution' ].value = new THREE.Vector2( window.innerWidth, window.innerHeight );
+				outerShader.uniforms[ 'resolution' ].value.multiplyScalar( window.devicePixelRatio );
+				finalComposer.addPass( outerShader );
+
+				params = {
+					pixelSize: 4,
+					postprocessing: true
+				};
+				//-----------------------------------------------------------------------Pixel Shader
+				effect = new OutlineEffect( renderer );
+				finalComposer.render();
+			}
+
+
+
+
+			function disposeMaterial( obj ) {
+
+				if ( obj.material ) {
+
+					obj.material.dispose();
+
+				}
+
+			}
+
+			function render() {
+
+				//camera.updateProjectionMatrix();
+				finalComposer.render();
+
+			}
+
+			function restoreMaterial( obj ) {
+
+				if ( materials[ obj.uuid ] ) {
+
+					obj.material = materials[ obj.uuid ];
+					delete materials[ obj.uuid ];
+
+				}
+
+			}
+
+		</script>
+</div>
+	</body>
+
+</html>
