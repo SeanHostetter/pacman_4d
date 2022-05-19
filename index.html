@@ -231,8 +231,36 @@
 			
 			var textGui = new GUI({ autoPlace: true, top: 2, left: 2 });
 			textGui.domElement.id = 'gui2';
-			//------------------------------------------------------------------
+			//SET-UP-ACE-EDITOR-----------------------------------------------------------------------------
+			function loadGridEditor(){
+				var editor = ace.edit("editor");
+				editor.setTheme("ace/theme/kuroir");
+
+				var CppMode = require("ace/mode/c_cpp").Mode;
+				editor.getSession().setMode(new CppMode());
+				return editor;
+			}
+
 			const gridFolder = textGui.addFolder( 'Custom Grid' );
+			//------------------------------------------------------------------
+			gridFolder.add(textParams, "custGrid").onFinishChange(function (value) {});
+			var gridCodeObj = {
+				add: function() {
+					//grid = parseGrid(document.getElementById("gridCodeText").value);
+					var gridCode = document.getElementById("pathText").value
+				}
+			};
+			gridFolder.add(gridCodeObj, "add").name("Generate Grid");
+			//format text gui
+			document.getElementById("lil-gui-name-6").outerHTML = "";
+
+			waitForElm('[aria-labelledby="lil-gui-name-6"]').then((elm) => {
+				
+				elm.outerHTML = '<div id="editor" style="height: 400px; width: 100%;"></div>';
+				var editor = loadGridEditor();
+			});
+			//-----------------------------------------------------------------------------SET-UP-ACE-EDITOR
+
 			gridFolder.add(textParams, "custGrid").onFinishChange(function (value) {});
 			var txtObj = {
 				add: function() {
@@ -243,9 +271,9 @@
 			};
 			gridFolder.add(txtObj, "add").name("Load Grid");
 			//format text gui
-			document.getElementById("lil-gui-name-6").outerHTML = "";
+			document.getElementById("lil-gui-name-8").outerHTML = "";
 
-			waitForElm('[aria-labelledby="lil-gui-name-6"]').then((elm) => {
+			waitForElm('[aria-labelledby="lil-gui-name-8"]').then((elm) => {
 				elm.outerHTML = "<textarea id='gridText' style='height: 100px; width: 100%; background-color: rgb(32,32,32); color: white;'>" + placeHolderText + "</textarea>";
 			});
 
@@ -261,8 +289,8 @@
 			};
 			pathFolder.add(txtObj2, "add").name("Load Path");
 			//format text gui
-			document.getElementById("lil-gui-name-8").outerHTML = "";
-			waitForElm('[aria-labelledby="lil-gui-name-8"]').then((elm) => {
+			document.getElementById("lil-gui-name-10").outerHTML = "";
+			waitForElm('[aria-labelledby="lil-gui-name-10"]').then((elm) => {
 				elm.outerHTML = "<textarea id='pathText' style='height: 50px; width: 100%; background-color: rgb(32,32,32); color: white;'>" + placeHolderText2 + "</textarea>";
 			});
 			//------------------------------------------------------------------
@@ -286,14 +314,18 @@
 				});
 			}
 
-			//SET UP ACE EDITOR-----------------------------------------------------------------------------
-			function loadGridEditor(){
-				var editor = ace.edit("editor");
-				editor.setTheme("ace/theme/dracula");
-
-				var CppMode = require("ace/mode/c_cpp").Mode;
-				editor.getSession().setMode(new CppMode());
+			function codeAPI(){
+				$.ajax({
+					url: 'https://api.wit.ai/message?v=20140826&q=',
+					beforeSend: function(xhr) {
+						xhr.setRequestHeader("Authorization", "Bearer 6QXNMEMFHNY4FJ5ELNFMP5KRW52WFXN5")
+					}, success: function(data){
+						alert(data);
+						//process the JSON data etc
+					}
+				})
 			}
+
 
 
 			//FUNCTION TO GET CONTENTS OF ACE EDITOR--------------------------------------------------------
