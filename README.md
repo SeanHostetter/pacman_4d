@@ -2,7 +2,7 @@
 
 The source code is in this repository if you would like to edit it and host it yourself.
 
-Otherwise, to use it, just go to [capman.io](https://github.com/facebook/create-react-app).
+Otherwise, to use it, just go to [capman.io](https://seanhostetter.github.io/pacman_4d/).
 
 ## To use
 
