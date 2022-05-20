@@ -247,7 +247,9 @@
 			var gridCodeObj = {
 				add: function() {
 					//grid = parseGrid(document.getElementById("gridCodeText").value);
-					var gridCode = document.getElementById("pathText").value
+					//var gridCode = document.getElementById("pathText").value
+
+					console.log("test btn");
 				}
 			};
 			gridFolder.add(gridCodeObj, "add").name("Generate Grid");
