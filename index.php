@@ -242,13 +242,17 @@
 			}
 
 			const gridFolder = textGui.addFolder( 'Custom Grid' );
-			//------------------------------------------------------------------
+			//----------------------------------------------------------------------------------------------
 			gridFolder.add(textParams, "custGrid").onFinishChange(function (value) {});
 			var gridCodeObj = {
 				add: function() {
 					//grid = parseGrid(document.getElementById("gridCodeText").value);
-					var gridCode = document.getElementById("pathText").value
-				}
+					//var gridCode = document.getElementById("pathText").value;
+					<?php 
+						echo "<script>console.log('test php');</script>"
+					?>
+					console.log("test");
+					}
 			};
 			gridFolder.add(gridCodeObj, "add").name("Generate Grid");
 			//format text gui
