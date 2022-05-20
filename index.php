@@ -249,11 +249,7 @@
 					//grid = parseGrid(document.getElementById("gridCodeText").value);
 					var gridCode = document.getElementById("pathText").value
 						<?php 
-							$path = 'C:/xampp/htdocs/user/execute.php';
-							exec($path, $output,$return);
-							var_dump($return);
-							echo "hi"."<br>";
-							echo "end";
+							echo "<script>console.log('test php');</script>"
 						?>
 					}
 			};
