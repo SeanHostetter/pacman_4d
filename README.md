@@ -2,7 +2,7 @@
 
 The source code is in this repository if you would like to edit it and host it yourself.
 
-Otherwise, to use it, just go to https://manpac.herokuapp.com/ (depreciated)
+Otherwise, to use it, just go to https://manpac.herokuapp.com/ (depreciated, api key for c++ compiler expired)
 
 ## To use
 
